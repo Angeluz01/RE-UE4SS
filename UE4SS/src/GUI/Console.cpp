@@ -1,4 +1,4 @@
-#include <ctype.h>
+#include <cctype>
 #include <memory>
 
 #include <DynamicOutput/DynamicOutput.hpp>
@@ -64,76 +64,9 @@ namespace RC::GUI
 
     auto Console::render() -> void
     {
-        /*
-        auto max_line_width = m_current_console_output_width - 10.0f;
-        std::string console_buffer{};
-        {
-            std::lock_guard<std::mutex> guard(m_lines_mutex);
-            for (const auto& line : m_lines)
-            {
-                if (!m_filter.PassFilter(line.c_str()))
-                {
-                    continue;
-                }
-                const char* remaining{};
-                auto line_width = CalcTextSize(line.c_str(), m_current_console_output_width, &remaining).x;
-                auto max_string_length = remaining - line.c_str();
-                if (max_string_length > 0 && line_width > max_line_width)
-                {
-                    auto num_lines = static_cast<int>(std::ceil(line.length() / max_string_length)) + 1;
-                    int last_line{};
-                    for (int i = 0; num_lines > 0 && i < num_lines; ++i)
-                    {
-                        console_buffer.append(line.substr(last_line, max_string_length));
-                        console_buffer.append("\n");
-                        last_line = last_line + max_string_length;
-                    }
-                }
-                else
-                {
-                    console_buffer.append(line);
-                    console_buffer.append("\n");
-                }
-            }
-        }
-
-        const float footer_height_to_reserve = (ImGui::GetStyle().ItemSpacing.y * 10.0f) + ImGui::GetFrameHeightWithSpacing();
-        ImGui_InputTextMultiline_WithAutoScroll("##consolebuffer", console_buffer.data(), console_buffer.size() + 1, {-10, -footer_height_to_reserve},
-        ImGuiInputTextFlags_ReadOnly, nullptr, nullptr, &m_previous_max_scroll_y); m_current_console_output_width = ImGui::CalcItemWidth();
-
-        ImGui::Separator();
-
-        ImGui::BeginDisabled(true);
-        bool reclaim_focus{};
-        ImGuiInputTextFlags input_text_flags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackCompletion |
-        ImGuiInputTextFlags_CallbackHistory; auto text_edit_callback_wrapper = [](ImGuiInputTextCallbackData* data) -> int { Console* console =
-        static_cast<Console*>(data->UserData); Output::send(STR("text_edit_callback_wrapper\n"));
-            //return console->text_edit_callback(data);
-            return 0;
-        };
-        ImGui::PushItemWidth(-12.0f);
-        if (ImGui::InputText("##console_input_buffer", m_input_buffer, IM_ARRAYSIZE(m_input_buffer), input_text_flags, text_edit_callback_wrapper, this))
-        {
-            Output::send(STR("ConsoleInput\n"));
-            reclaim_focus = true;
-        }
-        ImGui::PopItemWidth();
-
-        ImGui::SetItemDefaultFocus();
-        if (reclaim_focus)
-        {
-            ImGui::SetKeyboardFocusHere(-1);
-        }
-        ImGui::EndDisabled();
-        //*/
-
-        /**/
-
         std::lock_guard<std::mutex> guard(m_lines_mutex);
         m_text_editor.Render("TextEditor", {-16.0f, -31.0f + -8.0f});
-
         ImGui_AutoScroll("TextEditor", &m_previous_max_scroll_y);
-        //*/
     }
 
     auto Console::render_search_box() -> void
@@ -166,50 +99,57 @@ namespace RC::GUI
         throw std::runtime_error{"[LogLevel_to_ImColor] Unhandled log_level"};
     }
 
+    // 1) Overload taking std::string
     auto Console::add_line(const std::string& line, Color::Color color) -> void
     {
         std::lock_guard<std::mutex> guard(m_lines_mutex);
+
+        // FILTER: only allow our mod’s “Current Profile:” lines
+        if (line.find("Current Profile:") == std::string::npos)
+            return;
+
         if (m_text_editor.GetTotalLines() < 0)
-        {
-            throw std::runtime_error{"Somehow we negative amount of lines in the console"};
-        }
+            throw std::runtime_error{"Negative line count in console"};
+
         if (static_cast<size_t>(m_text_editor.GetTotalLines()) >= m_maximum_num_lines)
-        {
             m_text_editor.ClearLines();
-        }
+
         if (m_lines.size() >= m_maximum_num_lines)
-        {
             m_lines.clear();
-        }
+
         if (color != Color::Default && color != Color::NoColor)
-        {
-            m_text_editor.GetLineColorMarkers().emplace(m_text_editor.GetTotalLines() + 1, LogLevel_to_ImColor(color));
-        }
+            m_text_editor.GetLineColorMarkers()
+                .emplace(m_text_editor.GetTotalLines() + 1, LogLevel_to_ImColor(color));
+
         m_lines.emplace_back(line);
         m_text_editor.AddTextLine(line);
     }
 
+    // 2) Overload taking StringType
     auto Console::add_line(const StringType& line, Color::Color color) -> void
     {
         auto utf8_string = to_string(line);
         std::lock_guard<std::mutex> guard(m_lines_mutex);
+
+        // FILTER: only allow our mod’s “Current Profile:” lines
+        if (utf8_string.find("Current Profile:") == std::string::npos)
+            return;
+
         if (m_text_editor.GetTotalLines() < 0)
-        {
-            throw std::runtime_error{"Somehow we negative amount of lines in the console"};
-        }
+            throw std::runtime_error{"Negative line count in console"};
+
         if (static_cast<size_t>(m_text_editor.GetTotalLines()) >= m_maximum_num_lines)
-        {
             m_text_editor.ClearLines();
-        }
+
         if (m_lines.size() >= m_maximum_num_lines)
-        {
             m_lines.clear();
-        }
+
         if (color != Color::Default && color != Color::NoColor)
-        {
-            m_text_editor.GetLineColorMarkers().emplace(m_text_editor.GetTotalLines() + 1, LogLevel_to_ImColor(color));
-        }
+            m_text_editor.GetLineColorMarkers()
+                .emplace(m_text_editor.GetTotalLines() + 1, LogLevel_to_ImColor(color));
+
         m_lines.emplace_back(utf8_string);
         m_text_editor.AddTextLine(utf8_string);
     }
+
 } // namespace RC::GUI
